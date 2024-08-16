@@ -141,24 +141,27 @@ class SharedFileViewSet(ViewSet):
 
     @swagger_auto_schema(
         operation_summary="List Shared Files",
-        operation_description="Retrieve a list of all shared files owned by the authenticated user.",
+        operation_description="Retrieve a list of all shared files for the authenticated user.",
         responses={200: SharedFileSerializer(many=True)},
     )
     def list(self, request):
-        shared_files = self.queryset.filter(owner=request.user)
+        shared_files = self.queryset.filter(shared_with=request.user)
         serializer = self.serializer_class(shared_files, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
         operation_summary="Create Shared File",
-        operation_description="Create a new shared file and associate it with the authenticated user.",
+        operation_description="Create a new shared file with the authenticated user as the recipient.",
         request_body=SharedFileSerializer,
         responses={201: SharedFileSerializer, 400: 'Bad Request'},
     )
     def create(self, request):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
-            serializer.save(owner=request.user)
+
+            validated_data = serializer.validated_data
+            validated_data['shared_with'] = request.user
+            serializer.save(**validated_data)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -168,7 +171,7 @@ class SharedFileViewSet(ViewSet):
         responses={200: SharedFileSerializer, 404: 'Not Found'},
     )
     def retrieve(self, request, pk=None):
-        shared_file = get_object_or_404(self.queryset, pk=pk, owner=request.user)
+        shared_file = get_object_or_404(self.queryset, pk=pk, shared_with=request.user)
         serializer = self.serializer_class(shared_file)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -179,7 +182,7 @@ class SharedFileViewSet(ViewSet):
         responses={200: SharedFileSerializer, 400: 'Bad Request', 404: 'Not Found'},
     )
     def update(self, request, pk=None):
-        shared_file = get_object_or_404(self.queryset, pk=pk, owner=request.user)
+        shared_file = get_object_or_404(self.queryset, pk=pk, shared_with=request.user)
         serializer = self.serializer_class(shared_file, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -192,6 +195,6 @@ class SharedFileViewSet(ViewSet):
         responses={204: 'No Content', 404: 'Not Found'},
     )
     def destroy(self, request, pk=None):
-        shared_file = get_object_or_404(self.queryset, pk=pk, owner=request.user)
+        shared_file = get_object_or_404(self.queryset, pk=pk, shared_with=request.user)
         shared_file.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
